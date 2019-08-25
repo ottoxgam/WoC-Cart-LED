@@ -1,20 +1,30 @@
 #include <FastLED.h>
 #include <EasyButton.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
+#include <ESP8266WebServer.h>
+#include <Arduino.h>
+
+ESP8266WebServer server(80);
+
 
 FASTLED_USING_NAMESPACE
 
 #define DATA_PIN    3
-//#define CLK_PIN   4
 #define LED_TYPE    WS2811
 #define COLOR_ORDER BRG
-#define NUM_LEDS    64
+#define NUM_LEDS    38
 CRGB leds[NUM_LEDS];
 
-#define BRIGHTNESS          96
-#define FRAMES_PER_SECOND  120
-#define BUTTON_PIN D7
+#define BRIGHTNESS         255
+#define FRAMES_PER_SECOND  100
+#define BUTTON_PIN D8
+#define OFF_PIN D7
 
 EasyButton button(BUTTON_PIN);
+EasyButton offbutton(OFF_PIN);
 
 CRGBPalette16 currentPalette;
 TBlendType    currentBlending;
@@ -22,25 +32,59 @@ extern CRGBPalette16 myRedWhiteBluePalette;
 extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
 static uint8_t startIndex = 0;
 
+#ifndef STASSID
+#define STASSID "PixelESP8226"
+#define STAPSK "Cdr3T1Lee!"
+#endif
+
+IPAddress apIP(192, 168, 1, 1);
+const char* ssid = STASSID;
+const char* password = STAPSK;
+
 void setup() {
-  delay(3000); // 3 second delay for recovery
+  Serial.begin(115200);
+  Serial.println("Booting");
+    //WiFi.mode(WIFI_AP);
+    //WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+    //WiFi.softAP(ssid, password);
+
+    //MDNS.begin("esp8266", WiFi.softAPIP());
+    //Serial.println("Ready");
+    //Serial.print("IP address: ");
+    //Serial.println(WiFi.softAPIP());
+
+    //ArduinoOTA.begin();
+    //server.on("/",[](){
+    //  delay(100);
+    //  Serial.println("Hello!");
+    //  server.send(200,"text/plain", "Hello!!");
+    //});
+    //server.begin();
+
+  //ArduinoOTA.begin();
+  
+  delay(1000); // 3 second delay for recovery
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
       button.begin();
-    button.onPressed(onPressed);
+      offbutton.begin();
+    button.onPressed(APressed);
+    offbutton.onPressed(BPressed);
     currentPalette = RainbowColors_p;
 
 }
 
 // List of patterns to cycle through.  Each is defined as a separate function below.
 typedef void (*SimplePatternList[])();
-SimplePatternList gPatterns = { rainbow, rainbowWithGlitter, confetti, cloudy, sinelon, juggle, bpm, purplegreen, rwb, christmas};
+SimplePatternList gPatterns = { rainbow, rainbowWithGlitter, confetti, cloudy, sinelon, juggle, bpm, purplegreen, rwb, christmas, allblack};
 
 uint8_t gCurrentPatternNumber = 0; // Index number of which pattern is current
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns
   
 void loop()
 {
+  //ArduinoOTA.handle();
+  //server.handleClient();
   gPatterns[gCurrentPatternNumber]();
   FastLED.show();  
   FastLED.delay(1000/FRAMES_PER_SECOND); 
@@ -50,8 +94,16 @@ void loop()
 
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 
-void onPressed() {
+void APressed() {
     nextPattern();
+    Serial.println("Next Pattern");
+
+}
+
+void BPressed() {
+   allblack();
+   Serial.println("To Black");
+
 }
 void nextPattern()
 {
@@ -116,23 +168,23 @@ void rwb()
 const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM =
 {
     CRGB::Red,
-    CRGB::Gray, // 'white' is too bright compared to red and blue
-    CRGB::Blue,
-    CRGB::Black,
+    CRGB::Red, // 'white' is too bright compared to red and blue
+    CRGB::Red,
+    CRGB::Red,
     
-    CRGB::Red,
+    CRGB::Gray,
+    CRGB::Gray,
     CRGB::Gray,
     CRGB::Blue,
-    CRGB::Black,
     
+    CRGB::Blue,
+    CRGB::Red,
     CRGB::Red,
     CRGB::Red,
     CRGB::Gray,
     CRGB::Gray,
     CRGB::Blue,
-    CRGB::Blue,
-    CRGB::Black,
-    CRGB::Black
+    CRGB::Blue
 };
 
 void FillFromPalette(uint8_t colorIndex)
@@ -207,4 +259,19 @@ void juggle() {
     leds[beatsin16( i+7, 0, NUM_LEDS-1 )] |= CHSV(dothue, 200, 255);
     dothue += 32;
   }
+}
+
+void allblack()
+{
+    uint8_t brightness = 255;
+    static uint8_t startIndex = 0;
+    startIndex = startIndex + 1;
+    CRGB red = CHSV( HUE_RED, 255, 255);
+    CRGB green  = CHSV( HUE_GREEN, 255, 255);
+    CRGB black  = CRGB::Black;
+    currentBlending = NOBLEND;
+    currentPalette = CRGBPalette16(
+                                   black,  black,  black,  black );
+    FillFromPalette( startIndex);
+   
 }
